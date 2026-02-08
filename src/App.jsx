@@ -1,67 +1,97 @@
-import { useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import Entrance from './components/Entrance/Entrance';
-import Hallway from './components/Hallway/Hallway';
-import Room from './components/Room/Room';
-import { TimeProvider } from './contexts/TimeContext';
-import { SoundProvider } from './contexts/SoundContext';
-import './index.css';
+import { useEffect, useRef, useState } from 'react';
+import Game from "./core/Game";
+import OverlayUI from './ui/OverlayUI';
 
 function App() {
-  const [view, setView] = useState('ENTRANCE'); // Views: ENTRANCE, HALLWAY, Room Types
+  const containerRef = useRef(null);
+  const gameRef = useRef(null);
+  const [currentScene, setCurrentScene] = useState('');
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const getComponent = () => {
-    switch (view) {
-      case 'ENTRANCE':
-        return (
-          <motion.div
-            key="entrance"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, scale: 2, transition: { duration: 1.5, ease: "easeInOut" } }}
-            style={{ width: '100%', height: '100%' }}
-          >
-            <Entrance onEnter={() => setView('HALLWAY')} />
-          </motion.div>
-        );
-      case 'HALLWAY':
-        return (
-          <motion.div
-            key="hallway"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.2, transition: { duration: 0.8 } }}
-            style={{ width: '100%', height: '100%' }}
-          >
-            <Hallway onNavigate={setView} />
-          </motion.div>
-        );
-      default:
-        // Must be a ROOM view (e.g. LIVING_ROOM)
-        return (
-          <motion.div
-            key={view}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{ width: '100%', height: '100%' }}
-          >
-            <Room type={view} onBack={() => setView('HALLWAY')} />
-          </motion.div>
-        );
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // Create game instance
+    gameRef.current = new Game(containerRef.current);
+
+    // Listen for scene changes
+    const handleSceneChange = (e) => {
+      setCurrentScene(e.detail.scene);
+      if (gameRef.current?.sceneManager) {
+        setCanGoBack(gameRef.current.sceneManager.canGoBack());
+      }
+    };
+
+    // Listen for mute changes
+    const handleMuteChange = (e) => {
+      setIsMuted(e.detail.muted);
+    };
+
+    window.addEventListener('sceneChange', handleSceneChange);
+    window.addEventListener('muteChange', handleMuteChange);
+
+    // Hide loading after short delay
+    setTimeout(() => setIsLoading(false), 1500);
+
+    return () => {
+      window.removeEventListener('sceneChange', handleSceneChange);
+      window.removeEventListener('muteChange', handleMuteChange);
+
+      if (gameRef.current) {
+        gameRef.current.destroy();
+        gameRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleBack = () => {
+    if (gameRef.current?.sceneManager) {
+      gameRef.current.sceneManager.goBack();
     }
   };
 
+  const handleMuteToggle = () => {
+    // Import dynamically to avoid circular dependency
+    import('./core/SoundManager').then(({ soundManager }) => {
+      soundManager.toggleMute();
+    });
+  };
+
   return (
-    <TimeProvider>
-      <SoundProvider view={view}>
-        <div className="App" style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: '#000' }}>
-          <AnimatePresence mode="wait">
-            {getComponent()}
-          </AnimatePresence>
+    <>
+      {/* Loading Screen */}
+      {isLoading && (
+        <div className="loading-screen">
+          <div className="loading-content">
+            <h1 className="loading-title shimmer-text">Eternal With Her</h1>
+            <div className="loading-spinner"></div>
+            <p className="loading-text">Preparing your experience...</p>
+          </div>
         </div>
-      </SoundProvider>
-    </TimeProvider>
+      )}
+
+      {/* Game Canvas Container */}
+      <div
+        ref={containerRef}
+        style={{
+          width: '100vw',
+          height: '100vh',
+          overflow: 'hidden',
+          position: 'relative',
+        }}
+      />
+
+      {/* React Overlay UI */}
+      <OverlayUI
+        currentScene={currentScene}
+        canGoBack={canGoBack}
+        isMuted={isMuted}
+        onBack={handleBack}
+        onMuteToggle={handleMuteToggle}
+      />
+    </>
   );
 }
 
