@@ -1,0 +1,735 @@
+// src/scenes/CurtainScene.jsx
+import * as PIXI from 'pixi.js';
+import * as THREE from 'three';
+import gsap from 'gsap';
+import Matter from 'matter-js';
+import { SCENES, COLORS } from '../core/constants.jsx';
+import soundManager from '../core/SoundManager.jsx';
+
+export default class CurtainScene {
+  constructor(manager) {
+    this.manager = manager;
+    this.container = new PIXI.Container();
+    this.isOpening = false;
+    this.pullProgress = 0;
+    this.pullThreshold = 50;
+    this.accumulatedPull = 0;
+
+    // Physics
+    this.engine = null;
+    this.ropeSegments = [];
+
+    // THREE.js wave animation
+    this.threeRenderer = null;
+    this.threeScene = null;
+    this.threeCamera = null;
+    this.waveMesh = null;
+    this.clock = null;
+    this.waveContainer = null;
+  }
+
+  init() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    this.createBackground();
+    this.createThreeWaveAnimation();
+    this.createCurtains();
+    this.createRopePhysics();
+    this.createRopeGraphics();
+    this.setupPointerEvents();
+
+    // Fade in the scene
+    this.container.alpha = 0;
+    gsap.to(this.container, {
+      alpha: 1,
+      duration: 1.2,
+      ease: 'power2.out'
+    });
+  }
+
+  createBackground() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    // Dark theatrical background
+    const bg = new PIXI.Graphics();
+    bg.rect(0, 0, w, h);
+    bg.fill(0x0a0a0a);
+    this.container.addChild(bg);
+  }
+
+  createThreeWaveAnimation() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const dpr = window.devicePixelRatio;
+
+    // Create clock for animation timing
+    this.clock = new THREE.Clock();
+
+    // Create renderer with transparency
+    this.threeRenderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true
+    });
+    this.threeRenderer.setSize(w, h);
+    this.threeRenderer.setClearColor(0x000000, 0);
+    this.threeRenderer.setPixelRatio(dpr);
+
+    // Create DOM container for THREE.js canvas
+    this.waveContainer = document.createElement('div');
+    this.waveContainer.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    `;
+    this.waveContainer.appendChild(this.threeRenderer.domElement);
+    document.body.appendChild(this.waveContainer);
+
+    // Fade in the wave animation
+    setTimeout(() => {
+      this.waveContainer.style.opacity = '1';
+    }, 100);
+
+    // Camera setup
+    const fov = 60;
+    const fovRad = (fov / 2) * (Math.PI / 180);
+    const dist = h / 2 / Math.tan(fovRad);
+
+    this.threeCamera = new THREE.PerspectiveCamera(fov, w / h, 1, dist * 2);
+    this.threeCamera.position.set(0, 0, 10);
+
+    this.threeScene = new THREE.Scene();
+
+    // Create wave geometry
+    const geo = new THREE.BufferGeometry();
+    const positions = [];
+
+    const gridDistance = 4;
+    const gridWidth = 500 * (w / h);
+    const depth = 500;
+
+    for (let x = 0; x < gridWidth; x += gridDistance) {
+      for (let z = 0; z < depth; z += gridDistance) {
+        positions.push(-gridWidth / 2 + x, -35, -depth / 2 + z);
+      }
+    }
+
+    const positionAttribute = new THREE.Float32BufferAttribute(positions, 3);
+    geo.setAttribute('position', positionAttribute);
+
+    // Wave parameters
+    const waveSpeed = 1.5;
+    const waveIntensity = 6.0;
+    const pointSize = 1.2;
+
+    // Shader material for wave animation
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        u_time: { value: 0.0 },
+        u_point_size: { value: pointSize },
+        u_color: { value: new THREE.Color('#8b0000') }, // Deep velvet red
+      },
+      vertexShader: `
+        #define M_PI 3.1415926535897932384626433832795
+        precision mediump float;
+        uniform float u_time;
+        uniform float u_point_size;
+        
+        void main() {
+          vec3 p = position;
+          p.y += (
+            cos(p.x / M_PI * ${waveIntensity.toFixed(1)} + u_time * ${waveSpeed.toFixed(1)}) +
+            sin(p.z / M_PI * ${waveIntensity.toFixed(1)} + u_time * ${waveSpeed.toFixed(1)})
+          );
+          gl_PointSize = u_point_size;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+        }
+      `,
+      fragmentShader: `
+        precision mediump float;
+        uniform vec3 u_color;
+        
+        void main() {
+          gl_FragColor = vec4(u_color, 0.6);
+        }
+      `,
+      transparent: true,
+    });
+
+    this.waveMesh = new THREE.Points(geo, mat);
+    this.threeScene.add(this.waveMesh);
+    this.waveGeometry = geo;
+    this.waveMaterial = mat;
+  }
+
+  createCurtains() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    // Left curtain container
+    this.leftCurtain = new PIXI.Container();
+    this.leftCurtainGraphics = new PIXI.Graphics();
+    this.leftCurtain.addChild(this.leftCurtainGraphics);
+
+    // Right curtain container
+    this.rightCurtain = new PIXI.Container();
+    this.rightCurtainGraphics = new PIXI.Graphics();
+    this.rightCurtain.addChild(this.rightCurtainGraphics);
+
+    this.rightCurtain.x = w / 2;
+
+    // Initialize wave parameters for curtains
+    this.curtainWaveTime = 0;
+    this.initCurtainWavePoints(w, h);
+
+    // Create valance
+    this.createValance(w, h);
+
+    this.container.addChild(this.leftCurtain);
+    this.container.addChild(this.rightCurtain);
+  }
+
+  initCurtainWavePoints(w, h) {
+    const curtainWidth = w / 2 + 40;
+    const spacing = 15;
+    const rows = Math.ceil(h / spacing) + 1;
+    const cols = Math.ceil(curtainWidth / spacing) + 1;
+
+    this.leftWavePoints = [];
+    this.rightWavePoints = [];
+
+    for (let row = 0; row < rows; row++) {
+      this.leftWavePoints[row] = [];
+      this.rightWavePoints[row] = [];
+
+      for (let col = 0; col < cols; col++) {
+        this.leftWavePoints[row][col] = {
+          x: col * spacing,
+          y: row * spacing,
+          phase: Math.random() * Math.PI * 2,
+          amplitude: 2 + Math.random() * 3,
+          freq: 0.5 + Math.random() * 0.3
+        };
+        this.rightWavePoints[row][col] = {
+          x: col * spacing,
+          y: row * spacing,
+          phase: Math.random() * Math.PI * 2,
+          amplitude: 2 + Math.random() * 3,
+          freq: 0.5 + Math.random() * 0.3
+        };
+      }
+    }
+
+    this.waveRows = rows;
+    this.waveCols = cols;
+    this.waveSpacing = spacing;
+  }
+
+  drawCurtain(graphics, wavePoints, width, height, isRight) {
+    graphics.clear();
+
+    const time = this.curtainWaveTime;
+
+    // Draw base curtain
+    graphics.rect(0, 0, width, height);
+    graphics.fill(COLORS.VELVET_RED);
+
+    // Draw wave-animated fold lines
+    const foldCount = 12;
+    const foldSpacing = width / foldCount;
+
+    for (let f = 0; f < foldCount; f++) {
+      const baseX = f * foldSpacing;
+      const col = Math.min(Math.floor(baseX / this.waveSpacing), this.waveCols - 1);
+
+      // Calculate wave offset using sine/cosine like the THREE.js shader
+      // Wide soft shadow layer
+      graphics.moveTo(baseX, 0);
+      for (let row = 0; row < this.waveRows; row++) {
+        const point = wavePoints[row][col];
+        const waveOffset = (
+          Math.cos(point.x / Math.PI * 6.0 + time * 1.5) +
+          Math.sin(point.y / Math.PI * 6.0 + time * 1.5)
+        ) * point.amplitude * 0.5;
+
+        const x = baseX + waveOffset;
+        const y = point.y;
+
+        if (row === 0) graphics.moveTo(x, y);
+        else graphics.lineTo(x, y);
+      }
+      graphics.stroke({ width: 16, color: 0x000000, alpha: 0.1 });
+
+      // Medium shadow layer
+      graphics.moveTo(baseX, 0);
+      for (let row = 0; row < this.waveRows; row++) {
+        const point = wavePoints[row][col];
+        const waveOffset = (
+          Math.cos(point.x / Math.PI * 6.0 + time * 1.5) +
+          Math.sin(point.y / Math.PI * 6.0 + time * 1.5)
+        ) * point.amplitude * 0.4;
+
+        const x = baseX + waveOffset;
+        const y = point.y;
+
+        if (row === 0) graphics.moveTo(x, y);
+        else graphics.lineTo(x, y);
+      }
+      graphics.stroke({ width: 10, color: 0x000000, alpha: 0.18 });
+
+      // Core shadow
+      graphics.moveTo(baseX, 0);
+      for (let row = 0; row < this.waveRows; row++) {
+        const point = wavePoints[row][col];
+        const waveOffset = (
+          Math.cos(point.x / Math.PI * 6.0 + time * 1.5) +
+          Math.sin(point.y / Math.PI * 6.0 + time * 1.5)
+        ) * point.amplitude * 0.3;
+
+        const x = baseX + waveOffset;
+        const y = point.y;
+
+        if (row === 0) graphics.moveTo(x, y);
+        else graphics.lineTo(x, y);
+      }
+      graphics.stroke({ width: 5, color: 0x000000, alpha: 0.28 });
+
+      // Thin dark accent
+      graphics.moveTo(baseX + 3, 0);
+      for (let row = 0; row < this.waveRows; row++) {
+        const point = wavePoints[row][col];
+        const waveOffset = (
+          Math.cos(point.x / Math.PI * 6.0 + time * 1.5) +
+          Math.sin(point.y / Math.PI * 6.0 + time * 1.5)
+        ) * point.amplitude * 0.2;
+
+        const x = baseX + 3 + waveOffset;
+        const y = point.y;
+
+        if (row === 0) graphics.moveTo(x, y);
+        else graphics.lineTo(x, y);
+      }
+      graphics.stroke({ width: 2, color: 0x000000, alpha: 0.15 });
+    }
+
+    // Edge wave effect
+    const edgeX = isRight ? 0 : width - 5;
+    const edgeCol = isRight ? 0 : this.waveCols - 1;
+
+    // Wide outer shadow
+    graphics.moveTo(edgeX, 0);
+    for (let row = 0; row < this.waveRows; row++) {
+      const point = wavePoints[row][edgeCol];
+      const waveOffset = (
+        Math.cos(point.x / Math.PI * 6.0 + time * 1.5) +
+        Math.sin(point.y / Math.PI * 6.0 + time * 1.5)
+      ) * point.amplitude * 0.8;
+
+      const x = edgeX + (isRight ? -waveOffset : waveOffset);
+      const y = point.y;
+
+      if (row === 0) graphics.moveTo(x, y);
+      else graphics.lineTo(x, y);
+    }
+    graphics.stroke({ width: 18, color: 0x000000, alpha: 0.12 });
+
+    // Core edge shadow
+    graphics.moveTo(edgeX, 0);
+    for (let row = 0; row < this.waveRows; row++) {
+      const point = wavePoints[row][edgeCol];
+      const waveOffset = (
+        Math.cos(point.x / Math.PI * 6.0 + time * 1.5) +
+        Math.sin(point.y / Math.PI * 6.0 + time * 1.5)
+      ) * point.amplitude * 0.6;
+
+      const x = edgeX + (isRight ? -waveOffset : waveOffset);
+      const y = point.y;
+
+      if (row === 0) graphics.moveTo(x, y);
+      else graphics.lineTo(x, y);
+    }
+    graphics.stroke({ width: 8, color: 0x000000, alpha: 0.3 });
+
+    // Deep burgundy accent
+    graphics.moveTo(edgeX, 0);
+    for (let row = 0; row < this.waveRows; row++) {
+      const point = wavePoints[row][edgeCol];
+      const waveOffset = (
+        Math.cos(point.x / Math.PI * 6.0 + time * 1.5) +
+        Math.sin(point.y / Math.PI * 6.0 + time * 1.5)
+      ) * point.amplitude * 0.5;
+
+      const x = edgeX + (isRight ? -waveOffset : waveOffset);
+      const y = point.y;
+
+      if (row === 0) graphics.moveTo(x, y);
+      else graphics.lineTo(x, y);
+    }
+    graphics.stroke({ width: 3, color: 0x5a0000, alpha: 0.4 });
+  }
+
+  createValance(w, h) {
+    this.valance = new PIXI.Graphics();
+    this.valance.rect(0, 0, w, 60);
+    this.valance.fill(COLORS.VELVET_RED);
+
+    // Shadow layers
+    for (let i = 0; i < 3; i++) {
+      const shadow = new PIXI.Graphics();
+      shadow.rect(0, 52 + i * 3, w, 4);
+      shadow.fill({ color: 0x000000, alpha: 0.12 - i * 0.03 });
+      this.container.addChild(shadow);
+    }
+
+    // Subtle swags
+    for (let i = 0; i < 8; i++) {
+      const swag = new PIXI.Graphics();
+      const sx = (w / 8) * i + w / 16;
+
+      swag.moveTo(sx - 40, 60);
+      swag.bezierCurveTo(sx - 22, 75, sx + 22, 75, sx + 40, 60);
+      swag.stroke({ width: 3, color: 0x000000, alpha: 0.2 });
+
+      this.container.addChild(swag);
+    }
+
+    this.container.addChild(this.valance);
+  }
+
+  createRopePhysics() {
+    this.engine = Matter.Engine.create({
+      gravity: { x: 0, y: 0.25 }
+    });
+
+    const w = window.innerWidth;
+    const ropeX = w / 2;
+    const ropeY = 75;
+    const segments = 14;
+    const segmentLength = 18;
+
+    const group = Matter.Body.nextGroup(true);
+
+    for (let i = 0; i < segments; i++) {
+      const body = Matter.Bodies.rectangle(
+        ropeX,
+        ropeY + i * segmentLength,
+        5,
+        segmentLength,
+        {
+          collisionFilter: { group },
+          chamfer: { radius: 1 },
+          density: 0.001,
+          frictionAir: 0.02,
+          restitution: 0.02,
+        }
+      );
+      this.ropeSegments.push(body);
+    }
+
+    for (let i = 0; i < segments - 1; i++) {
+      const constraint = Matter.Constraint.create({
+        bodyA: this.ropeSegments[i],
+        pointA: { x: 0, y: segmentLength / 2 },
+        bodyB: this.ropeSegments[i + 1],
+        pointB: { x: 0, y: -segmentLength / 2 },
+        stiffness: 0.88,
+        damping: 0.12,
+      });
+      Matter.Composite.add(this.engine.world, constraint);
+    }
+
+    this.anchor = Matter.Constraint.create({
+      pointA: { x: ropeX, y: ropeY - segmentLength / 2 },
+      bodyB: this.ropeSegments[0],
+      pointB: { x: 0, y: -segmentLength / 2 },
+      stiffness: 1,
+      length: 0,
+    });
+
+    Matter.Composite.add(this.engine.world, this.ropeSegments);
+    Matter.Composite.add(this.engine.world, this.anchor);
+
+    const tasselBody = Matter.Bodies.circle(
+      ropeX,
+      ropeY + segments * segmentLength + 6,
+      14,
+      {
+        collisionFilter: { group },
+        density: 0.015,
+        frictionAir: 0.018,
+      }
+    );
+    this.tassel = tasselBody;
+
+    const tasselConstraint = Matter.Constraint.create({
+      bodyA: this.ropeSegments[segments - 1],
+      pointA: { x: 0, y: segmentLength / 2 },
+      bodyB: tasselBody,
+      pointB: { x: 0, y: -10 },
+      stiffness: 0.85,
+      damping: 0.12,
+    });
+
+    Matter.Composite.add(this.engine.world, [tasselBody, tasselConstraint]);
+  }
+
+  createRopeGraphics() {
+    this.ropeGraphics = new PIXI.Graphics();
+    this.container.addChild(this.ropeGraphics);
+
+    this.tasselGraphics = new PIXI.Container();
+
+    // Dark wood handle
+    const handleBody = new PIXI.Graphics();
+    handleBody.roundRect(-10, -14, 20, 28, 3);
+    handleBody.fill(0x2a1508);
+
+    // Wood grain
+    for (let i = -8; i <= 8; i += 3) {
+      const grain = new PIXI.Graphics();
+      grain.moveTo(i, -12);
+      grain.lineTo(i + 0.5, 12);
+      grain.stroke({ width: 0.6, color: 0x1a0a04, alpha: 0.4 });
+      handleBody.addChild(grain);
+    }
+
+    // Brass caps
+    const topCap = new PIXI.Graphics();
+    topCap.roundRect(-8, -18, 16, 5, 2);
+    topCap.fill(0x6b5a40);
+
+    const bottomCap = new PIXI.Graphics();
+    bottomCap.roundRect(-8, 12, 16, 5, 2);
+    bottomCap.fill(0x6b5a40);
+
+    // Fringe
+    const fringe = new PIXI.Graphics();
+    for (let i = -3; i <= 3; i++) {
+      fringe.moveTo(i * 2, 16);
+      fringe.lineTo(i * 2 + i * 0.5, 36);
+    }
+    fringe.stroke({ width: 1.5, color: 0x2a1508 });
+
+    // Knot
+    const knot = new PIXI.Graphics();
+    knot.circle(0, 18, 3);
+    knot.fill(0x3a2515);
+
+    this.tasselGraphics.addChild(handleBody, topCap, bottomCap, fringe, knot);
+    this.container.addChild(this.tasselGraphics);
+
+    this.tasselGraphics.eventMode = 'static';
+    this.tasselGraphics.cursor = 'grab';
+    this.tasselGraphics.hitArea = new PIXI.Circle(0, 10, 40);
+  }
+
+  setupPointerEvents() {
+    this.isDragging = false;
+    this.lastY = 0;
+
+    this.tasselGraphics.on('pointerdown', (e) => {
+      if (this.isOpening) return;
+      this.isDragging = true;
+      this.lastY = e.global.y;
+      this.tasselGraphics.cursor = 'grabbing';
+
+      gsap.to(this.tasselGraphics.scale, {
+        x: 1.05, y: 1.05,
+        duration: 0.15,
+        ease: 'power2.out'
+      });
+    });
+
+    const onMove = (e) => {
+      if (!this.isDragging || this.isOpening) return;
+
+      const currentY = e.global.y;
+      const deltaY = currentY - this.lastY;
+
+      if (deltaY > 0) {
+        Matter.Body.applyForce(this.tassel, this.tassel.position, {
+          x: 0, y: deltaY * 0.0004
+        });
+
+        this.accumulatedPull += Math.abs(deltaY);
+        if (this.accumulatedPull >= this.pullThreshold && !this.isOpening) {
+          this.startOpening();
+        }
+      }
+
+      this.lastY = currentY;
+    };
+
+    const onUp = () => {
+      if (!this.isDragging) return;
+      this.isDragging = false;
+      this.tasselGraphics.cursor = 'grab';
+
+      gsap.to(this.tasselGraphics.scale, {
+        x: 1, y: 1,
+        duration: 0.2,
+        ease: 'power2.out'
+      });
+
+      if (!this.isOpening && this.accumulatedPull < this.pullThreshold) {
+        Matter.Body.applyForce(this.tassel, this.tassel.position, {
+          x: 0, y: -0.004
+        });
+        gsap.to(this, { accumulatedPull: 0, duration: 0.5 });
+      }
+    };
+
+    this.container.eventMode = 'static';
+    this.container.on('pointermove', onMove);
+    this.container.on('pointerup', onUp);
+    this.container.on('pointerupoutside', onUp);
+  }
+
+  startOpening() {
+    if (this.isOpening) return;
+    this.isOpening = true;
+
+    soundManager.play('curtainOpen');
+
+    const w = window.innerWidth;
+
+    // Fade out wave animation
+    if (this.waveContainer) {
+      gsap.to(this.waveContainer.style, {
+        opacity: 0,
+        duration: 1
+      });
+    }
+
+    const timeline = gsap.timeline({
+      onComplete: () => {
+        this.manager.change(SCENES.HOUSE, { transition: 'fade', duration: 0.8 });
+      }
+    });
+
+    // Anticipation
+    timeline.to(this.leftCurtain, { x: -8, duration: 0.25, ease: 'power1.in' });
+    timeline.to(this.rightCurtain, { x: this.rightCurtain.x + 8, duration: 0.25, ease: 'power1.in' }, '<');
+
+    // Main opening
+    timeline.to(this.leftCurtain, { x: -w / 2 - 60, duration: 1.8, ease: 'power2.inOut' }, '+=0.1');
+    timeline.to(this.rightCurtain, { x: w + 30, duration: 1.8, ease: 'power2.inOut' }, '<');
+
+    // Rotation
+    timeline.to(this.leftCurtain, { rotation: -0.02, duration: 1.2, ease: 'sine.inOut' }, '-=1.8');
+    timeline.to(this.rightCurtain, { rotation: 0.02, duration: 1.2, ease: 'sine.inOut' }, '-=1.8');
+
+    // Fade elements
+    timeline.to(this.valance, { alpha: 0.4, duration: 1.2 }, '-=1.8');
+    timeline.to(this.ropeGraphics, { alpha: 0, duration: 0.5 }, '-=1.6');
+    timeline.to(this.tasselGraphics, { alpha: 0, y: this.tassel.position.y + 30, duration: 0.6, ease: 'power2.in' }, '-=1.6');
+  }
+
+  update(delta) {
+    if (!this.engine) return;
+
+    Matter.Engine.update(this.engine, delta * 16.67);
+
+    // Update curtain wave time
+    this.curtainWaveTime += delta * 0.02;
+
+    // Redraw curtains with wave effect
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    this.drawCurtain(this.leftCurtainGraphics, this.leftWavePoints, w / 2 + 40, h, false);
+    this.drawCurtain(this.rightCurtainGraphics, this.rightWavePoints, w / 2 + 40, h, true);
+
+    // Update THREE.js wave animation
+    if (this.threeRenderer && this.waveMesh && !this.isOpening) {
+      const time = this.clock.getElapsedTime();
+      this.waveMesh.material.uniforms.u_time.value = time;
+      this.threeRenderer.render(this.threeScene, this.threeCamera);
+    }
+
+    // Draw rope
+    this.ropeGraphics.clear();
+    if (this.ropeSegments.length > 0) {
+      // Shadow
+      this.ropeGraphics.moveTo(this.ropeSegments[0].position.x + 1, this.ropeSegments[0].position.y - 6);
+      for (const segment of this.ropeSegments) {
+        this.ropeGraphics.lineTo(segment.position.x + 1, segment.position.y);
+      }
+      this.ropeGraphics.stroke({ width: 6, color: 0x000000, alpha: 0.2 });
+
+      // Main rope
+      this.ropeGraphics.moveTo(this.ropeSegments[0].position.x, this.ropeSegments[0].position.y - 6);
+      for (const segment of this.ropeSegments) {
+        this.ropeGraphics.lineTo(segment.position.x, segment.position.y);
+      }
+      this.ropeGraphics.stroke({ width: 4, color: 0x2a1508 });
+
+      // Highlight
+      this.ropeGraphics.moveTo(this.ropeSegments[0].position.x - 0.5, this.ropeSegments[0].position.y - 6);
+      for (const segment of this.ropeSegments) {
+        this.ropeGraphics.lineTo(segment.position.x - 0.5, segment.position.y);
+      }
+      this.ropeGraphics.stroke({ width: 1, color: 0x4a3520, alpha: 0.4 });
+    }
+
+    // Update tassel
+    if (this.tassel) {
+      this.tasselGraphics.position.set(this.tassel.position.x, this.tassel.position.y);
+      this.tasselGraphics.rotation = this.tassel.angle;
+    }
+  }
+
+  enter() {
+    soundManager.register('curtainOpen', '/assets/sounds/curtain.mp3');
+    soundManager.register('click', '/assets/sounds/click.mp3');
+  }
+
+  exit() {
+    gsap.killTweensOf(this.tasselGraphics.scale);
+    gsap.killTweensOf(this);
+  }
+
+  resize() {
+    // Handle resize
+    if (this.threeRenderer && this.threeCamera) {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      this.threeCamera.aspect = w / h;
+      this.threeCamera.updateProjectionMatrix();
+      this.threeRenderer.setSize(w, h);
+    }
+  }
+
+  destroy() {
+    gsap.killTweensOf(this.tasselGraphics.scale);
+    gsap.killTweensOf(this);
+
+    // Cleanup THREE.js
+    if (this.waveContainer && this.waveContainer.parentNode) {
+      this.waveContainer.parentNode.removeChild(this.waveContainer);
+    }
+    if (this.threeRenderer) {
+      this.threeRenderer.dispose();
+    }
+    if (this.waveGeometry) {
+      this.waveGeometry.dispose();
+    }
+    if (this.waveMaterial) {
+      this.waveMaterial.dispose();
+    }
+
+    if (this.engine) {
+      Matter.Engine.clear(this.engine);
+      this.engine = null;
+    }
+
+    this.ropeSegments = [];
+    this.container.destroy({ children: true });
+  }
+}
