@@ -8,7 +8,7 @@ import Matter from "matter-js";
  * @param {number} config.y - Y position of rope anchor  
  * @param {number} config.segments - Number of rope segments (default: 8)
  * @param {number} config.segmentLength - Length of each segment (default: 20)
- * @param {number} config.stiffness - Constraint stiffness (default: 0.9)
+ * @param {number} config.stiffness - Constraint stiffness (default: 0.95)
  * @returns {Object} - Object containing rope composite and end body
  */
 export function createRope({
@@ -16,8 +16,8 @@ export function createRope({
   y,
   segments = 8,
   segmentLength = 20,
-  stiffness = 0.9,
-  damping = 0.1,
+  stiffness = 0.95,
+  damping = 0.05,
   ropeWidth = 8,
 }) {
   const group = Matter.Body.nextGroup(true);
@@ -35,9 +35,9 @@ export function createRope({
       {
         collisionFilter: { group },
         chamfer: { radius: 2 },
-        density: 0.005,
-        frictionAir: 0.02,
-        restitution: 0.1,
+        density: 0.002, // Reduced for faster response
+        frictionAir: 0.01, // Less air resistance
+        restitution: 0.05,
       }
     );
 
@@ -107,8 +107,8 @@ export function createTassel({
     radius,
     {
       collisionFilter: { group },
-      density: 0.01,
-      frictionAir: 0.02,
+      density: 0.008, // Slightly increased for better pull detection
+      frictionAir: 0.01,
     }
   );
 
@@ -117,7 +117,7 @@ export function createTassel({
     pointA: { x: 0, y: segmentLength / 2 },
     bodyB: tassel,
     pointB: { x: 0, y: -radius * 0.7 },
-    stiffness: 0.9,
+    stiffness: 0.95,
     length: 0,
   });
 
