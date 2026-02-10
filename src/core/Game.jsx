@@ -26,7 +26,7 @@ export default class Game {
       this.app.ticker.add(this.update.bind(this));
 
       // Change to the initial scene
-      this.sceneManager.change(SCENES.CURTAIN);
+      this.sceneManager.change(SCENES.HOUSE); 
 
       // Handle window resize
       window.addEventListener('resize', this.handleResize.bind(this));
