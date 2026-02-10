@@ -1,7 +1,6 @@
 // src/core/SceneManager.jsx
 import gsap from 'gsap';
 import { SCENES } from './constants.jsx';
-import CurtainScene from '../scenes/CurtainScene.jsx';
 import HouseScene from '../scenes/HouseScene.jsx';
 import InteriorScene from '../scenes/InteriorScene.jsx';
 import LivingRoom from '../scenes/rooms/LivingRoom.jsx';
@@ -22,8 +21,6 @@ export default class SceneManager {
 
   createScene(sceneName) {
     switch (sceneName) {
-      case SCENES.CURTAIN:
-        return new CurtainScene(this);
       case SCENES.HOUSE:
         return new HouseScene(this);
       case SCENES.INTERIOR:
