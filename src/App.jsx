@@ -1,98 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
-import Game from "./core/Game";
-import OverlayUI from './ui/OverlayUI';
+import { WaveAnimation } from "./components/ui/wave-animation";
 
-function App() {
-  const containerRef = useRef(null);
-  const gameRef = useRef(null);
-  const [currentScene, setCurrentScene] = useState('');
-  const [canGoBack, setCanGoBack] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    // Create game instance
-    gameRef.current = new Game(containerRef.current);
-
-    // Listen for scene changes
-    const handleSceneChange = (e) => {
-      setCurrentScene(e.detail.scene);
-      if (gameRef.current?.sceneManager) {
-        setCanGoBack(gameRef.current.sceneManager.canGoBack());
-      }
-    };
-
-    // Listen for mute changes
-    const handleMuteChange = (e) => {
-      setIsMuted(e.detail.muted);
-    };
-
-    window.addEventListener('sceneChange', handleSceneChange);
-    window.addEventListener('muteChange', handleMuteChange);
-
-    // Hide loading after short delay
-    setTimeout(() => setIsLoading(false), 1500);
-
-    return () => {
-      window.removeEventListener('sceneChange', handleSceneChange);
-      window.removeEventListener('muteChange', handleMuteChange);
-
-      if (gameRef.current) {
-        gameRef.current.destroy();
-        gameRef.current = null;
-      }
-    };
-  }, []);
-
-  const handleBack = () => {
-    if (gameRef.current?.sceneManager) {
-      gameRef.current.sceneManager.goBack();
-    }
-  };
-
-  const handleMuteToggle = () => {
-    // Import dynamically to avoid circular dependency
-    import('./core/SoundManager').then(({ soundManager }) => {
-      soundManager.toggleMute();
-    });
-  };
-
+export default function DemoBackground() {
   return (
-    <>
-      {/* Loading Screen */}
-      {isLoading && (
-        <div className="loading-screen">
-          <div className="loading-content">
-            <h1 className="loading-title shimmer-text">Eternal With Her</h1>
-            <div className="loading-spinner"></div>
-            <p className="loading-text">Preparing your experience...</p>
-          </div>
-        </div>
-      )}
+    <main className="relative h-screen w-full overflow-hidden bg-black">
+      {/* IMPORTANT: z-10 ensures the text is on top. 
+         pointer-events-none lets you click "through" the text to the canvas.
+      */}
+      <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+        <h1 className="text-7xl font-bold tracking-tighter text-white uppercase drop-shadow-[0_0_15px_rgba(255,0,0,0.5)]">
+          Red Wave
+        </h1>
+      </div>
 
-      {/* Game Canvas Container */}
-      <div
-        ref={containerRef}
-        style={{
-          width: '100vw',
-          height: '100vh',
-          overflow: 'hidden',
-          position: 'relative',
-        }}
-      />
-
-      {/* React Overlay UI */}
-      <OverlayUI
-        currentScene={currentScene}
-        canGoBack={canGoBack}
-        isMuted={isMuted}
-        onBack={handleBack}
-        onMuteToggle={handleMuteToggle}
-      />
-    </>
+      <WaveAnimation 
+        waveSpeed={1.5}
+        waveIntensity={45} 
+        particleColor="#ff0000" 
+        pointSize={2.5}
+        gridDistance={5}
+        className="absolute inset-0"
+      /> 
+    </main>
   );
 }
-
-export default App;
