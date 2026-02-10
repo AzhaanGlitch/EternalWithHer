@@ -5,11 +5,10 @@ import * as THREE from "three"
 export function WaveAnimation({
   width,
   height,
-  pointSize = 1.5,
-  waveSpeed = 0.5,      
-  waveIntensity = 5.0,  
-  particleColor = "#ff0000",
-  gridDistance = 3, 
+  waveSpeed = 0.10,
+  waveIntensity = 5.0,
+  curtainColor = "#7e1515", 
+  gridDistance = 0.5,
   className = "",
 }) {
   const canvasRef = useRef(null)
@@ -33,80 +32,93 @@ export function WaveAnimation({
     rendererRef.current = renderer
     container.appendChild(renderer.domElement)
 
-    const geo = new THREE.BufferGeometry()
-    const positions = []
-    const gridWidth = 1600 
+    // Create a plane geometry for solid surface
+    const gridWidth = 1600
     const gridHeight = 1000
+    const segmentsX = Math.floor(gridWidth / gridDistance)
+    const segmentsY = Math.floor(gridHeight / gridDistance)
 
-    for (let x = -gridWidth / 2; x < gridWidth / 2; x += gridDistance) {
-      for (let y = -gridHeight / 2; y < gridHeight / 2; y += gridDistance) {
-        positions.push(x, y, 0)
-      }
-    }
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+    const geo = new THREE.PlaneGeometry(gridWidth, gridHeight, segmentsX, segmentsY)
 
     const mat = new THREE.ShaderMaterial({
       uniforms: {
         u_time: { value: 0.0 },
-        u_point_size: { value: pointSize },
         u_intensity: { value: waveIntensity },
-        u_color: { value: new THREE.Color(particleColor) },
+        u_color: { value: new THREE.Color(curtainColor) },
       },
       vertexShader: `
         precision mediump float;
         uniform float u_time;
-        uniform float u_point_size;
         uniform float u_intensity;
+        
+        varying float vWave;
+        varying vec3 vPosition;
         
         void main() {
           vec3 p = position;
           
-          // SPLIT LOGIC:
-          // abs(p.x) makes the math symmetrical around the center Y-axis.
-          // Subtracting u_time from the absolute X creates the outward flow.
           float centerX = abs(p.x);
           
           float wave = 0.0;
           
           // Layer 1: Main outward roll
-          wave += sin(centerX * 0.01 - u_time * 2.0) * 2.0;
+          wave += sin(centerX * 0.01 - u_time * 1.0) * 2.0;
           
           // Layer 2: Medium ripples
-          wave += sin(centerX * 0.03 - u_time * 3.5) * 1.0;
+          wave += sin(centerX * 0.03 - u_time * 1.75) * 1.0;
           
-          // Layer 3: Vertical subtle movement for organic feel
-          wave += cos(p.y * 0.01 + u_time * 0.5) * 0.5;
+          // Layer 3: Vertical subtle movement
+          wave += cos(p.y * 0.01 + u_time * 0.25) * 0.5;
 
           // Apply displacement to Z
           p.z += wave * u_intensity;
+          
+          vWave = wave;
+          vPosition = p;
 
-          gl_PointSize = u_point_size;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
         }
       `,
       fragmentShader: `
         precision mediump float;
         uniform vec3 u_color;
+        uniform float u_intensity;
+        
+        varying float vWave;
+        varying vec3 vPosition;
+        
         void main() {
-          float dist = distance(gl_PointCoord, vec2(0.5));
-          if (dist > 0.5) discard;
+          // Base dark red maroon color
+          vec3 baseColor = u_color;
           
-          // Slight glow effect: brighter center, softer edges
-          float alpha = 0.7 * (1.0 - dist * 2.0);
-          gl_FragColor = vec4(u_color, alpha);
+          // Create shadow effect based on wave depth
+          // Normalize wave value to 0-1 range for shadow calculation
+          float shadowIntensity = (vWave / u_intensity) * 0.5 + 0.5;
+          
+          // Darker shadows in wave valleys (lower values), lighter on peaks
+          float shadow = smoothstep(0.3, 0.7, shadowIntensity);
+          
+          // Mix black shadow with base color
+          vec3 shadowColor = mix(vec3(0.0, 0.0, 0.0), baseColor, shadow * 0.6 + 0.4);
+          
+          // Add subtle gradient for depth
+          float depthFade = 1.0 - (vPosition.z / (u_intensity * 3.5)) * 0.3;
+          depthFade = clamp(depthFade, 0.7, 1.0);
+          
+          vec3 finalColor = shadowColor * depthFade;
+          
+          gl_FragColor = vec4(finalColor, 1.0);
         }
       `,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
+      side: THREE.DoubleSide,
     })
 
-    const mesh = new THREE.Points(geo, mat)
+    const mesh = new THREE.Mesh(geo, mat)
     scene.add(mesh)
 
     const clock = new THREE.Clock()
     const animate = () => {
-      mat.uniforms.u_time.value = clock.getElapsedTime() * waveSpeed;
+      mat.uniforms.u_time.value = clock.getElapsedTime() * waveSpeed
       renderer.render(scene, camera)
       animationIdRef.current = requestAnimationFrame(animate)
     }
@@ -131,7 +143,7 @@ export function WaveAnimation({
         container.removeChild(renderer.domElement)
       }
     }
-  }, [width, height, pointSize, waveSpeed, waveIntensity, particleColor, gridDistance])
+  }, [width, height, waveSpeed, waveIntensity, curtainColor, gridDistance])
 
   return <div ref={canvasRef} className={className} style={{ width: "100%", height: "100%" }} />
 }
