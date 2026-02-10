@@ -48,27 +48,9 @@ export default function OverlayUI({
 
   if (!isVisible) return null;
 
-  const sceneInfo = SCENE_INFO[currentScene] || { label: currentScene, icon: Heart, color: '#D4AF37' };
-  const IconComponent = sceneInfo.icon;
-
   return (
     <div className="overlay-ui">
-      {/* Top Bar */}
-      <div className="top-bar">
-        {/* Logo/Brand */}
-        <div className="brand">
-          <Heart className="brand-icon" size={20} />
-          <span className="brand-text">Eternal With Her</span>
-        </div>
-
-        {/* Scene Indicator */}
-        <div className="scene-indicator" style={{ '--accent-color': sceneInfo.color }}>
-          <IconComponent className="scene-icon" size={18} />
-          <span className="scene-label">{sceneInfo.label}</span>
-        </div>
-      </div>
-
-      {/* Bottom Controls */}
+      {/* Bottom Controls - Only mute button and back button when available */}
       <div className="bottom-bar">
         {/* Left side - Back button */}
         <div className="controls-left">
@@ -89,54 +71,16 @@ export default function OverlayUI({
           )}
         </div>
 
-        {/* Center - Scene subtitle */}
-        <div className="scene-subtitle">
-          {currentScene && SCENE_INFO[currentScene]?.label && (
-            <Sparkles className="subtitle-icon" size={14} />
-          )}
-        </div>
-
-        {/* Right side - Mute button */}
+        {/* Right side - Minimal mute button (icon only, no circle) */}
         <div className="controls-right">
           <button
-            className={`control-btn mute-btn ${isMuted ? 'muted' : ''}`}
+            className={`mute-btn-minimal ${isMuted ? 'muted' : ''}`}
             onClick={onMuteToggle}
-            onMouseEnter={() => setShowTooltip('mute')}
-            onMouseLeave={() => setShowTooltip(null)}
             aria-label={isMuted ? 'Unmute' : 'Mute'}
           >
-            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-            {showTooltip === 'mute' && (
-              <span className="tooltip">{isMuted ? 'Unmute' : 'Mute'}</span>
-            )}
+            {isMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
           </button>
         </div>
-      </div>
-
-      {/* Decorative Elements */}
-      <div className="corner-flourish top-left">
-        <svg viewBox="0 0 60 60" fill="none">
-          <path d="M0 60 Q0 0 60 0" stroke="currentColor" strokeWidth="1.5" fill="none" />
-          <circle cx="55" cy="5" r="2" fill="currentColor" />
-        </svg>
-      </div>
-      <div className="corner-flourish top-right">
-        <svg viewBox="0 0 60 60" fill="none">
-          <path d="M60 60 Q60 0 0 0" stroke="currentColor" strokeWidth="1.5" fill="none" />
-          <circle cx="5" cy="5" r="2" fill="currentColor" />
-        </svg>
-      </div>
-      <div className="corner-flourish bottom-left">
-        <svg viewBox="0 0 60 60" fill="none">
-          <path d="M0 0 Q0 60 60 60" stroke="currentColor" strokeWidth="1.5" fill="none" />
-          <circle cx="55" cy="55" r="2" fill="currentColor" />
-        </svg>
-      </div>
-      <div className="corner-flourish bottom-right">
-        <svg viewBox="0 0 60 60" fill="none">
-          <path d="M60 0 Q60 60 0 60" stroke="currentColor" strokeWidth="1.5" fill="none" />
-          <circle cx="5" cy="55" r="2" fill="currentColor" />
-        </svg>
       </div>
     </div>
   );
