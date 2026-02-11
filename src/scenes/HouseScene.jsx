@@ -4,6 +4,8 @@ import gsap from 'gsap';
 import { SCENES, COLORS } from '../core/constants.jsx';
 import soundManager from '../core/SoundManager.jsx';
 import houseImageUrl from '../assets/images/house.png';
+import cloudImageUrl from '../assets/images/cloud.png';
+import bgImageUrl from '../assets/images/House_scene_bg.png';
 
 export default class HouseScene {
   constructor(manager) {
@@ -19,10 +21,8 @@ export default class HouseScene {
   }
 
   async init() {
-    this.createSunsetSky();
-    this.createSun();
-    this.createClouds();
-    this.createMountains();
+    await this.createBackground();
+    await this.createClouds();
     this.createGreenland();
     this.createAnimatedGrass();
 
@@ -34,155 +34,82 @@ export default class HouseScene {
     this.createInstructions();
   }
 
-  // ── SUNSET SKY ──
-  createSunsetSky() {
+  // ── BACKGROUND IMAGE ──
+  async createBackground() {
     const w = window.innerWidth, h = window.innerHeight;
-    const sky = new PIXI.Container();
-    const colors = [
-      [20, 5, 30], [35, 8, 45], [60, 12, 50], [90, 18, 55],
-      [130, 30, 55], [170, 50, 50], [200, 75, 45],
-      [230, 110, 45], [248, 150, 55], [255, 185, 75],
-      [255, 205, 105], [255, 215, 140], [255, 210, 160],
-      [255, 195, 165], [250, 170, 155], [240, 145, 150]
-    ];
-    const strips = 80;
-    for (let i = 0; i < strips; i++) {
-      const s = new PIXI.Graphics();
-      const r = i / strips, ci = r * (colors.length - 1);
-      const f = ci - Math.floor(ci);
-      const c1 = colors[Math.min(Math.floor(ci), colors.length - 1)];
-      const c2 = colors[Math.min(Math.floor(ci) + 1, colors.length - 1)];
-      const cr = Math.round(c1[0] + (c2[0] - c1[0]) * f);
-      const cg = Math.round(c1[1] + (c2[1] - c1[1]) * f);
-      const cb = Math.round(c1[2] + (c2[2] - c1[2]) * f);
-      const sh = h / strips + 1;
-      s.rect(0, i * sh, w, sh + 1);
-      s.fill((cr << 16) | (cg << 8) | cb);
-      sky.addChild(s);
-    }
-    this.container.addChild(sky);
-  }
+    const skyH = h * 0.66; // background only covers the sky area above the grassland
+    try {
+      const bgTexture = await PIXI.Assets.load(bgImageUrl);
+      const bg = new PIXI.Sprite(bgTexture);
 
-  // ── SUN ──
-  createSun() {
-    const w = window.innerWidth, h = window.innerHeight;
-    const sun = new PIXI.Container();
-    const sr = Math.min(w, h) * 0.08;
+      // Cover-style scaling: fill the sky width, preserve aspect ratio
+      const imgAspect = bgTexture.width / bgTexture.height;
+      const skyAspect = w / skyH;
 
-    // Outer atmospheric glow rings
-    for (let i = 10; i > 0; i--) {
-      const g = new PIXI.Graphics();
-      g.circle(0, 0, sr + i * sr * 0.6);
-      g.fill({ color: (255 << 16) | ((190 + i * 4) << 8) | (60 + i * 12), alpha: 0.012 * (11 - i) });
-      sun.addChild(g);
+      if (skyAspect > imgAspect) {
+        // Screen sky area is wider than image — fit to width, crop height
+        bg.width = w;
+        bg.height = w / imgAspect;
+      } else {
+        // Screen sky area is taller than image — fit to height, crop width
+        bg.height = skyH;
+        bg.width = skyH * imgAspect;
+        bg.x = (w - bg.width) / 2; // center horizontally
+      }
+
+      // Align the bottom of the image to the grassland line
+      bg.y = skyH - bg.height;
+
+      this.container.addChild(bg);
+    } catch (err) {
+      console.warn('Failed to load background image, falling back to solid color:', err);
+      const fallback = new PIXI.Graphics();
+      fallback.rect(0, 0, w, skyH);
+      fallback.fill(0x1a0a20);
+      this.container.addChild(fallback);
     }
-    // Inner glow
-    for (let i = 6; i > 0; i--) {
-      const g = new PIXI.Graphics();
-      g.circle(0, 0, sr + i * 20);
-      g.fill({ color: 0xffcc44, alpha: 0.035 * (7 - i) });
-      sun.addChild(g);
-    }
-    const body = new PIXI.Graphics();
-    body.circle(0, 0, sr);
-    body.fill(0xffe880);
-    sun.addChild(body);
-    const core = new PIXI.Graphics();
-    core.circle(0, 0, sr * 0.55);
-    core.fill({ color: 0xfff8e0, alpha: 0.85 });
-    sun.addChild(core);
-    sun.position.set(w * 0.18, h * 0.36);
-    this.container.addChild(sun);
-    this._tw(sun.scale, { x: 1.04, y: 1.04, duration: 3.5, yoyo: true, repeat: -1, ease: 'sine.inOut' });
   }
 
   // ── CLOUDS ──
-  createClouds() {
+  async createClouds() {
     const w = window.innerWidth, h = window.innerHeight;
     const cc = new PIXI.Container();
-    // Cloud configs: [x, y, scale, puffs array]
-    const cloudConfigs = [
-      { x: w * 0.08, y: h * 0.08, sc: 0.7, drift: 35 },
-      { x: w * 0.30, y: h * 0.05, sc: 1.0, drift: 50 },
-      { x: w * 0.55, y: h * 0.11, sc: 0.8, drift: 40 },
-      { x: w * 0.80, y: h * 0.06, sc: 0.6, drift: 30 },
-      { x: w * 0.15, y: h * 0.20, sc: 0.5, drift: 25 },
-      { x: w * 0.92, y: h * 0.16, sc: 0.55, drift: 28 },
-    ];
-    cloudConfigs.forEach(({ x, y, sc, drift }) => {
-      const cloud = new PIXI.Container();
-      // Build a fluffy cloud from overlapping soft ellipses
-      const puffData = [
-        [-35, 4, 30, 16], [-10, -2, 40, 22], [20, 0, 35, 20],
-        [5, 8, 38, 14], [-22, -6, 28, 16], [35, -4, 25, 14],
-        [-5, -10, 32, 15], [15, 6, 30, 13],
+
+    try {
+      const cloudTexture = await PIXI.Assets.load(cloudImageUrl);
+
+      // Cloud configs: same positions, scales, and drift as before
+      const cloudConfigs = [
+        { x: w * 0.08, y: h * 0.08, sc: 0.7, drift: 35 },
+        { x: w * 0.30, y: h * 0.05, sc: 1.0, drift: 50 },
+        { x: w * 0.55, y: h * 0.11, sc: 0.8, drift: 40 },
+        { x: w * 0.80, y: h * 0.06, sc: 0.6, drift: 30 },
+        { x: w * 0.15, y: h * 0.20, sc: 0.5, drift: 25 },
+        { x: w * 0.92, y: h * 0.16, sc: 0.55, drift: 28 },
       ];
-      // Outer soft glow layer (subtle)
-      puffData.forEach(([px, py, rx, ry]) => {
-        const glow = new PIXI.Graphics();
-        glow.ellipse(px, py, rx + 6, ry + 4);
-        glow.fill({ color: 0xffd5c0, alpha: 0.04 });
-        cloud.addChild(glow);
+
+      cloudConfigs.forEach(({ x, y, sc, drift }) => {
+        const cloud = new PIXI.Sprite(cloudTexture);
+        cloud.anchor.set(0.5);
+        cloud.position.set(x, y);
+        cloud.scale.set(sc * 0.15); // scale down the image to match the original cloud sizes
+        cloud.alpha = 0.85;
+        cc.addChild(cloud);
+
+        // Same drifting animation as before
+        this._tw(cloud, {
+          x: x + drift + Math.random() * 25,
+          duration: 25 + Math.random() * 20,
+          yoyo: true, repeat: -1, ease: 'sine.inOut'
+        });
       });
-      // Main cloud body
-      puffData.forEach(([px, py, rx, ry]) => {
-        const puff = new PIXI.Graphics();
-        puff.ellipse(px, py, rx, ry);
-        puff.fill({ color: 0xffe8d8, alpha: 0.15 });
-        cloud.addChild(puff);
-      });
-      // Bright highlights on top puffs
-      [[-10, -6, 25, 12], [18, -4, 22, 11], [-25, -2, 18, 10]].forEach(([px, py, rx, ry]) => {
-        const hl = new PIXI.Graphics();
-        hl.ellipse(px, py, rx, ry);
-        hl.fill({ color: 0xfff5ee, alpha: 0.12 });
-        cloud.addChild(hl);
-      });
-      cloud.position.set(x, y);
-      cloud.scale.set(sc);
-      cc.addChild(cloud);
-      this._tw(cloud, {
-        x: x + drift + Math.random() * 25,
-        duration: 25 + Math.random() * 20,
-        yoyo: true, repeat: -1, ease: 'sine.inOut'
-      });
-    });
+    } catch (err) {
+      console.warn('Failed to load cloud image:', err);
+    }
+
     this.container.addChild(cc);
   }
 
-  // ── MOUNTAINS ──
-  createMountains() {
-    const w = window.innerWidth, h = window.innerHeight;
-    const ranges = [
-      {
-        baseY: h * 0.52, color: 0x2d1835, alpha: 0.7,
-        peaks: [[0, -h * 0.2, w * 0.25], [w * 0.15, -h * 0.25, w * 0.3], [w * 0.35, -h * 0.17, w * 0.25], [w * 0.5, -h * 0.22, w * 0.3], [w * 0.7, -h * 0.19, w * 0.25], [w * 0.85, -h * 0.15, w * 0.3]]
-      },
-      {
-        baseY: h * 0.58, color: 0x3a1d40, alpha: 0.8,
-        peaks: [[-w * 0.05, -h * 0.16, w * 0.3], [w * 0.2, -h * 0.2, w * 0.35], [w * 0.45, -h * 0.13, w * 0.28], [w * 0.6, -h * 0.18, w * 0.35], [w * 0.85, -h * 0.12, w * 0.3]]
-      },
-      {
-        baseY: h * 0.63, color: 0x1e3018, alpha: 0.9,
-        peaks: [[-w * 0.05, -h * 0.12, w * 0.35], [w * 0.25, -h * 0.14, w * 0.3], [w * 0.5, -h * 0.09, w * 0.3], [w * 0.7, -h * 0.13, w * 0.35]]
-      }
-    ];
-    ranges.forEach(({ baseY, color, alpha, peaks }) => {
-      const m = new PIXI.Graphics();
-      m.moveTo(0, baseY);
-      peaks.forEach(([px, py, pw]) => {
-        const mx = px + pw * 0.5;
-        m.bezierCurveTo(px + pw * 0.2, baseY - 10, mx - pw * 0.15, baseY + py + 10, mx, baseY + py);
-        m.bezierCurveTo(mx + pw * 0.15, baseY + py + 10, px + pw - pw * 0.2, baseY - 10, px + pw, baseY);
-      });
-      m.lineTo(w + 10, baseY);
-      m.lineTo(w + 10, h);
-      m.lineTo(0, h);
-      m.closePath();
-      m.fill({ color, alpha });
-      this.container.addChild(m);
-    });
-  }
 
   // ── GREENLAND ──
   createGreenland() {
@@ -417,7 +344,7 @@ export default class HouseScene {
       });
 
       // ── POSITION THE HOUSE: right-bottom corner of the screen ──
-      this.elements.house.position.set(w * 0.78, h * 1.18);
+      this.elements.house.position.set(w * 0.78, h * 0.90);
       this.container.addChild(this.elements.house);
 
       // ── All decorations below are added to the MAIN container ──
