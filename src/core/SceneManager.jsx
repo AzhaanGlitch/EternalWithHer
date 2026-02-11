@@ -80,7 +80,7 @@ export default class SceneManager {
 
     // Initialize the scene
     if (typeof this.currentScene.init === 'function') {
-      this.currentScene.init();
+      await this.currentScene.init();
     }
 
     this.app.stage.addChild(this.currentScene.container);
