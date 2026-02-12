@@ -12,6 +12,13 @@ class SoundManager {
         Howler.volume(this.masterVolume);
     }
 
+    // Resume AudioContext (call on user interaction)
+    resumeContext() {
+        if (Howler.ctx && Howler.ctx.state === 'suspended') {
+            Howler.ctx.resume();
+        }
+    }
+
     // Register a sound effect
     register(name, src, options = {}) {
         const defaultOptions = {
