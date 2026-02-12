@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react"
 import * as THREE from "three"
 import Matter from "matter-js"
 import { createRope, createRopeAnchor, createTassel } from "../../physics/rope"
+import soundManager from "../../core/SoundManager.jsx"
 
 export function WaveAnimation({
   width,
@@ -28,6 +29,36 @@ export function WaveAnimation({
 
     const w = width || container.clientWidth || window.innerWidth
     const h = height || container.clientHeight || window.innerHeight
+
+    // Register curtain sound (not ambient — so it doesn't conflict with scene ambient)
+    soundManager.register('curtainOpening', '/assets/sounds/curtain_opening.mp3', { loop: true, volume: 0.4 })
+
+    // Register curtain sound
+    soundManager.register('curtainOpening', '/assets/sounds/curtain_opening.mp3', { loop: true, volume: 0.4 })
+
+    // Strategy to play sound ASAP:
+    // 1. Try immediately (works if user interacted before reload)
+    // 2. Add global listener for any click/touch to start sound if blocked
+    let curtainSoundStarted = false
+    const startCurtainSound = () => {
+      // Resume AudioContext first (critical for autoplay policy)
+      soundManager.resumeContext()
+
+      if (!curtainSoundStarted && !isOpeningRef.current) {
+        soundManager.play('curtainOpening')
+        curtainSoundStarted = true
+
+        // Clean up listeners once started
+        window.removeEventListener('click', startCurtainSound)
+        window.removeEventListener('touchstart', startCurtainSound)
+        window.removeEventListener('keydown', startCurtainSound)
+      }
+    }
+
+    startCurtainSound()
+    window.addEventListener('click', startCurtainSound)
+    window.addEventListener('touchstart', startCurtainSound)
+    window.addEventListener('keydown', startCurtainSound)
 
     // ════════════════════════════════════════════════════════
     //  THREE.JS — Curtain wave scene
@@ -230,6 +261,8 @@ export function WaveAnimation({
         if (pullDistance > pullThreshold) {
           isOpeningRef.current = true
           hasTriggeredRef.current = true
+          // Stop curtain sound
+          soundManager.stop('curtainOpening')
           Matter.Composite.remove(engine.world, mouseConstraint)
           startCurtainOpen()
         }
@@ -301,6 +334,13 @@ export function WaveAnimation({
     // ── Cleanup ──
     return () => {
       window.removeEventListener("resize", handleResize)
+      window.removeEventListener("click", startCurtainSound)
+      window.removeEventListener("touchstart", startCurtainSound)
+      window.removeEventListener("keydown", startCurtainSound)
+
+      // Stop sound on unmount (safety net)
+      soundManager.stop('curtainOpening')
+
       if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current)
       Matter.Runner.stop(runner)
       Matter.Engine.clear(engine)
