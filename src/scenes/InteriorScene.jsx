@@ -57,50 +57,49 @@ export default class InteriorScene {
   createDoors() {
     const w = window.innerWidth, h = window.innerHeight;
 
-    // Door configs — 7 rooms, each with scene, config, position, and trapezoid corners
-    // Adjust anchor (x,y) and corner points (tl,tr,br,bl) to match the background image
     const doorConfigs = [
       {
         scene: SCENES.LIVING, config: ROOM_CONFIGS.LIVING,
-        x: w * 0.10, y: h * 0.50,
-        tl: { x: -25, y: -55 }, tr: { x: 25, y: -55 },
-        br: { x: 28, y: 55 }, bl: { x: -28, y: 55 },
+        x: w * 0.50, y: h * 0.95,
+        tl: { x: -150, y: -200 }, tr: { x: 180, y: -200 },
+        br: { x: 430, y: 55 }, bl: { x: -390, y: 55 },
       },
       {
         scene: SCENES.BEDROOM, config: ROOM_CONFIGS.BEDROOM,
-        x: w * 0.24, y: h * 0.50,
-        tl: { x: -25, y: -55 }, tr: { x: 25, y: -55 },
-        br: { x: 28, y: 55 }, bl: { x: -28, y: 55 },
+        x: w * 0.01, y: h * 0.50,
+        tl: { x: -25, y: -190 }, tr: { x: 200, y: -128 },
+        br: { x: 200, y: 208 }, bl: { x: -28, y: 280 },
       },
       {
         scene: SCENES.KITCHEN, config: ROOM_CONFIGS.KITCHEN,
-        x: w * 0.38, y: h * 0.50,
-        tl: { x: -25, y: -55 }, tr: { x: 25, y: -55 },
-        br: { x: 28, y: 55 }, bl: { x: -28, y: 55 },
+        x: w * 0.50, y: h * 0.50,
+        tl: { x: -128, y: -55 }, tr: { x: 214, y: -55 },
+        br: { x: 214, y: 138 }, bl: { x: -128, y: 138 },
       },
       {
         scene: SCENES.GAMING, config: ROOM_CONFIGS.GAMING,
-        x: w * 0.50, y: h * 0.50,
-        tl: { x: -25, y: -55 }, tr: { x: 25, y: -55 },
-        br: { x: 28, y: 55 }, bl: { x: -28, y: 55 },
+        x: w * 0.50, y: h * 0.30,
+        tl: { x: -130, y: -80 }, tr: { x: 138, y: -80 },
+        br: { x: 138, y: 84 }, bl: { x: -130, y: 84 },
       },
       {
         scene: SCENES.DANCE, config: ROOM_CONFIGS.DANCE,
-        x: w * 0.62, y: h * 0.50,
-        tl: { x: -25, y: -55 }, tr: { x: 25, y: -55 },
-        br: { x: 28, y: 55 }, bl: { x: -28, y: 55 },
+        x: w * 0.39, y: h * 0.50,
+        tl: { x: -30, y: 73 }, tr: { x: 30, y: -40 },
+        mr: { x: 51, y: -40 },
+        br: { x: 51, y: 128 }, bl: { x: -30, y: 140 },
       },
       {
         scene: SCENES.STUDY, config: ROOM_CONFIGS.STUDY,
-        x: w * 0.76, y: h * 0.50,
-        tl: { x: -25, y: -55 }, tr: { x: 25, y: -55 },
-        br: { x: 28, y: 55 }, bl: { x: -28, y: 55 },
+        x: w * 0.60, y: h * 0.30,
+        tl: { x: -32, y: -80 }, tr: { x: 25, y: -80 },
+        br: { x: 28, y: 84 }, bl: { x: -28, y: 84 },
       },
       {
         scene: SCENES.GARDEN, config: ROOM_CONFIGS.GARDEN,
-        x: w * 0.90, y: h * 0.50,
-        tl: { x: -25, y: -55 }, tr: { x: 25, y: -55 },
-        br: { x: 28, y: 55 }, bl: { x: -28, y: 55 },
+        x: w * 0.84, y: h * 0.50,
+        tl: { x: -25, y: -210 }, tr: { x: 270, y: -350 },
+        br: { x: 280, y: 350 }, bl: { x: -28, y: 240 },
       },
     ];
 
@@ -110,32 +109,39 @@ export default class InteriorScene {
   }
 
   createDoor(doorData, index) {
-    const { scene, config, x, y, tl, tr, br, bl } = doorData;
+    const { scene, config, x, y, tl, tr, mr, br, bl } = doorData;
 
     const door = new PIXI.Container();
 
-    // Helper: draw quad polygon
-    const drawQuad = (g, tl, tr, br, bl) => {
+    // Helper: draw quad or pentagon polygon
+    const drawQuad = (g, tl, tr, br, bl, mr = null) => {
       g.moveTo(tl.x, tl.y);
       g.lineTo(tr.x, tr.y);
+      if (mr) g.lineTo(mr.x, mr.y); // Add middle right point if provided
       g.lineTo(br.x, br.y);
       g.lineTo(bl.x, bl.y);
       g.closePath();
     };
 
-    // Helper: expand quad
-    const expandQuad = (tl, tr, br, bl, px) => ({
-      tl: { x: tl.x - px, y: tl.y - px },
-      tr: { x: tr.x + px, y: tr.y - px },
-      br: { x: br.x + px, y: br.y + px },
-      bl: { x: bl.x - px, y: bl.y + px },
-    });
+    // Helper: expand quad or pentagon
+    const expandQuad = (tl, tr, br, bl, px, mr = null) => {
+      const expanded = {
+        tl: { x: tl.x - px, y: tl.y - px },
+        tr: { x: tr.x + px, y: tr.y - px },
+        br: { x: br.x + px, y: br.y + px },
+        bl: { x: bl.x - px, y: bl.y + px },
+      };
+      if (mr) {
+        expanded.mr = { x: mr.x + px, y: mr.y };
+      }
+      return expanded;
+    };
 
     // ── Soft outer glow rings ──
     for (let i = 3; i > 0; i--) {
       const ring = new PIXI.Graphics();
-      const exp = expandQuad(tl, tr, br, bl, i * 8);
-      drawQuad(ring, exp.tl, exp.tr, exp.br, exp.bl);
+      const exp = expandQuad(tl, tr, br, bl, i * 8, mr);
+      drawQuad(ring, exp.tl, exp.tr, exp.br, exp.bl, exp.mr);
       ring.fill({ color: 0xffd080, alpha: 0.015 * (4 - i) });
       door.addChild(ring);
       this._tw(ring, {
@@ -146,7 +152,7 @@ export default class InteriorScene {
 
     // ── Glassy panel ──
     const glassPanel = new PIXI.Graphics();
-    drawQuad(glassPanel, tl, tr, br, bl);
+    drawQuad(glassPanel, tl, tr, br, bl, mr);
     glassPanel.fill({ color: 0xffffff, alpha: 0.06 });
     glassPanel.stroke({ width: 1, color: 0xffeedd, alpha: 0.15 });
     door.addChild(glassPanel);
@@ -154,7 +160,7 @@ export default class InteriorScene {
     // ── Light-sweep shimmer ──
     const shimmerContainer = new PIXI.Container();
     const shimmerMask = new PIXI.Graphics();
-    drawQuad(shimmerMask, tl, tr, br, bl);
+    drawQuad(shimmerMask, tl, tr, br, bl, mr);
     shimmerMask.fill(0xffffff);
     shimmerContainer.addChild(shimmerMask);
 
@@ -193,14 +199,14 @@ export default class InteriorScene {
 
     // ── Golden highlight on hover ──
     const doorHighlight = new PIXI.Graphics();
-    drawQuad(doorHighlight, tl, tr, br, bl);
+    drawQuad(doorHighlight, tl, tr, br, bl, mr);
     doorHighlight.stroke({ width: 2.5, color: COLORS.GOLD, alpha: 0 });
     door.addChild(doorHighlight);
 
     // ── Warm glow on hover ──
     const doorGlow = new PIXI.Graphics();
-    const glowExp = expandQuad(tl, tr, br, bl, 12);
-    drawQuad(doorGlow, glowExp.tl, glowExp.tr, glowExp.br, glowExp.bl);
+    const glowExp = expandQuad(tl, tr, br, bl, 12, mr);
+    drawQuad(doorGlow, glowExp.tl, glowExp.tr, glowExp.br, glowExp.bl, glowExp.mr);
     doorGlow.fill({ color: COLORS.GOLD, alpha: 0 });
     door.addChild(doorGlow);
 
@@ -226,8 +232,8 @@ export default class InteriorScene {
 
     // ── Invisible hit area ──
     const hitArea = new PIXI.Graphics();
-    const hitExp = expandQuad(tl, tr, br, bl, 10);
-    drawQuad(hitArea, hitExp.tl, hitExp.tr, hitExp.br, hitExp.bl);
+    const hitExp = expandQuad(tl, tr, br, bl, 10, mr);
+    drawQuad(hitArea, hitExp.tl, hitExp.tr, hitExp.br, hitExp.bl, hitExp.mr);
     hitArea.fill({ color: 0xffffff, alpha: 0.001 });
     door.addChild(hitArea);
 
@@ -265,9 +271,6 @@ export default class InteriorScene {
   }
 
   enter() {
-    // soundManager.register('doorOpen', '/assets/sounds/door.mp3');
-
-    // Start home_interior ambient music (persists across all room scenes)
     soundManager.setAmbient('/assets/sounds/home_interior.mp3', { volume: 0.35, loop: true });
 
     this.container.alpha = 0;
