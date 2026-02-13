@@ -11,6 +11,7 @@ export const SCENES = {
   DANCE: 'DANCE',
   STUDY: 'STUDY',
   GARDEN: 'GARDEN',
+  GARDEN_SITTING: 'GARDEN_SITTING',
 };
 
 export const COLORS = {
@@ -75,6 +76,13 @@ export const ROOM_CONFIGS = {
   GARDEN: {
     title: 'Garden',
     subtitle: 'Our Future Dreams',
+    color: 0x228b22,
+    gradientTop: 0x1a3a2a,
+    gradientBottom: 0x0a2a1a,
+  },
+  GARDEN_SITTING: {
+    title: 'Sitting Area',
+    subtitle: 'A Quiet Place',
     color: 0x228b22,
     gradientTop: 0x1a3a2a,
     gradientBottom: 0x0a2a1a,
