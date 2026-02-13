@@ -13,19 +13,49 @@ export default class BaseRoom {
         this.isInteractive = true;
     }
 
-    init() {
-        this.createBackground();
+    async init() {
+        await this.createBackground();
         this.createBackButton();
-        this.createRoomTitle();
     }
 
-    createBackground() {
+    async createBackground() {
         const { width, height } = this.getScreenSize();
+
+        // If a background image URL is provided, use it
+        if (this.config.backgroundImage) {
+            try {
+                const bgTexture = await PIXI.Assets.load(this.config.backgroundImage);
+                const bg = new PIXI.Sprite(bgTexture);
+
+                // Cover-style scaling
+                const imgAspect = bgTexture.width / bgTexture.height;
+                const screenAspect = width / height;
+
+                if (screenAspect > imgAspect) {
+                    bg.width = width;
+                    bg.height = width / imgAspect;
+                } else {
+                    bg.height = height;
+                    bg.width = height * imgAspect;
+                }
+
+                bg.x = (width - bg.width) / 2;
+                bg.y = (height - bg.height) / 2;
+
+                this.elements.background = bg;
+                this.container.addChild(bg);
+                return;
+            } catch (err) {
+                console.warn('Failed to load room background image:', err);
+                // Fall through to gradient background
+            }
+        }
+
+        // Fallback: gradient background
         const bgColor = this.config.backgroundColor || 0x1a1a2e;
         const gradientTop = this.config.gradientTop || bgColor;
         const gradientBottom = this.config.gradientBottom || bgColor;
 
-        // Create gradient background using multiple strips
         this.elements.background = new PIXI.Container();
 
         const strips = 20;
@@ -34,7 +64,6 @@ export default class BaseRoom {
             const ratio = i / strips;
             const stripHeight = height / strips + 1;
 
-            // Interpolate colors
             const color = this.lerpColor(gradientTop, gradientBottom, ratio);
 
             strip.rect(0, i * stripHeight, width, stripHeight);
@@ -61,100 +90,47 @@ export default class BaseRoom {
     }
 
     createBackButton() {
-        const button = new PIXI.Container();
-
-        // Button background
-        const bg = new PIXI.Graphics();
-        bg.roundRect(0, 0, 120, 45, 10);
-        bg.fill({ color: COLORS.GOLD, alpha: 0.2 });
-        bg.stroke({ width: 2, color: COLORS.GOLD, alpha: 0.8 });
-
-        // Arrow icon
-        const arrow = new PIXI.Graphics();
-        arrow.moveTo(35, 22.5);
-        arrow.lineTo(20, 22.5);
-        arrow.lineTo(28, 15);
-        arrow.moveTo(20, 22.5);
-        arrow.lineTo(28, 30);
-        arrow.stroke({ width: 3, color: COLORS.GOLD });
-
-        // Text
         const text = new PIXI.Text({
-            text: 'Back',
+            text: '← Back',
             style: {
                 fontFamily: 'Inter, Arial',
-                fontSize: 16,
-                fill: COLORS.GOLD,
-                fontWeight: '600',
+                fontSize: 18,
+                fill: 0xffffff,
+                fontWeight: '500',
             }
         });
-        text.anchor.set(0, 0.5);
-        text.position.set(45, 22.5);
-
-        button.addChild(bg, arrow, text);
-        button.position.set(30, 30);
+        text.anchor.set(0, 0);
+        text.position.set(30, 30);
 
         // Interactivity
-        button.eventMode = 'static';
-        button.cursor = 'pointer';
+        text.eventMode = 'static';
+        text.cursor = 'pointer';
 
-        button.on('pointerover', () => {
-            gsap.to(bg, { alpha: 1, duration: 0.2 });
-            gsap.to(button.scale, { x: 1.05, y: 1.05, duration: 0.2 });
+        text.on('pointerover', () => {
+            gsap.to(text, { alpha: 0.7, duration: 0.2 });
+            gsap.to(text.scale, { x: 1.05, y: 1.05, duration: 0.2 });
         });
 
-        button.on('pointerout', () => {
-            gsap.to(bg, { alpha: 0.2, duration: 0.2 });
-            gsap.to(button.scale, { x: 1, y: 1, duration: 0.2 });
+        text.on('pointerout', () => {
+            gsap.to(text, { alpha: 1, duration: 0.2 });
+            gsap.to(text.scale, { x: 1, y: 1, duration: 0.2 });
         });
 
-        button.on('pointertap', () => {
+        text.on('pointertap', () => {
             if (this.isInteractive) {
                 soundManager.play('click');
                 this.manager.goBack();
             }
         });
 
-        this.elements.backButton = button;
-        this.container.addChild(button);
+        this.elements.backButton = text;
+        this.container.addChild(text);
     }
 
-    createRoomTitle() {
-        if (!this.config.title) return;
 
-        const title = new PIXI.Text({
-            text: this.config.title,
-            style: {
-                fontFamily: 'Playfair Display, serif',
-                fontSize: 48,
-                fill: COLORS.GOLD,
-                fontWeight: '700',
-                dropShadow: {
-                    color: 0x000000,
-                    blur: 4,
-                    distance: 2,
-                    angle: Math.PI / 4,
-                    alpha: 0.5,
-                },
-            }
-        });
-
-        title.anchor.set(0.5, 0);
-        title.position.set(window.innerWidth / 2, 40);
-        title.alpha = 0;
-
-        this.elements.title = title;
-        this.container.addChild(title);
-    }
 
     enter() {
-        // Animate title in
-        if (this.elements.title) {
-            gsap.fromTo(this.elements.title,
-                { y: 20, alpha: 0 },
-                { y: 40, alpha: 1, duration: 0.8, ease: 'power2.out', delay: 0.3 }
-            );
-        }
+        // Override in subclass if needed
     }
 
     update(delta) {
@@ -171,24 +147,40 @@ export default class BaseRoom {
 
         // Update background
         if (this.elements.background) {
-            this.elements.background.children.forEach((strip, i) => {
-                const stripHeight = height / 20 + 1;
-                strip.clear();
-                strip.rect(0, i * stripHeight, width, stripHeight);
-                const ratio = i / 20;
-                const color = this.lerpColor(
-                    this.config.gradientTop || this.config.backgroundColor || 0x1a1a2e,
-                    this.config.gradientBottom || this.config.backgroundColor || 0x1a1a2e,
-                    ratio
-                );
-                strip.fill(color);
-            });
+            // If background is a Sprite (image), re-cover
+            if (this.elements.background instanceof PIXI.Sprite) {
+                const texture = this.elements.background.texture;
+                const imgAspect = texture.width / texture.height;
+                const screenAspect = width / height;
+
+                if (screenAspect > imgAspect) {
+                    this.elements.background.width = width;
+                    this.elements.background.height = width / imgAspect;
+                } else {
+                    this.elements.background.height = height;
+                    this.elements.background.width = height * imgAspect;
+                }
+
+                this.elements.background.x = (width - this.elements.background.width) / 2;
+                this.elements.background.y = (height - this.elements.background.height) / 2;
+            } else {
+                // Gradient strips
+                this.elements.background.children.forEach((strip, i) => {
+                    const stripHeight = height / 20 + 1;
+                    strip.clear();
+                    strip.rect(0, i * stripHeight, width, stripHeight);
+                    const ratio = i / 20;
+                    const color = this.lerpColor(
+                        this.config.gradientTop || this.config.backgroundColor || 0x1a1a2e,
+                        this.config.gradientBottom || this.config.backgroundColor || 0x1a1a2e,
+                        ratio
+                    );
+                    strip.fill(color);
+                });
+            }
         }
 
-        // Update title position
-        if (this.elements.title) {
-            this.elements.title.position.set(width / 2, 40);
-        }
+
     }
 
     getScreenSize() {
