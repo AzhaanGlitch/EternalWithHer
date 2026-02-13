@@ -192,7 +192,7 @@ export default class BaseRoom {
     }
 
     destroy() {
-        this.container.destroy({ children: true, texture: true });
+        this.container.destroy({ children: true, texture: false });
         this.elements = {};
     }
 }
