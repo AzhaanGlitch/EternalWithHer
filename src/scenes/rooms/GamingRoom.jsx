@@ -1,7 +1,7 @@
 // src/scenes/rooms/GamingRoom.jsx
 import BaseRoom from '../BaseRoom.jsx';
 import { ROOM_CONFIGS } from '../../core/constants.jsx';
-import gamingRoomImg from '../../assets/images/gaming_room.png';
+import gamingRoomImg from '../../assets/images/GamingRoom/gaming_room.png';
 
 export default class GamingRoom extends BaseRoom {
   constructor(manager) {
