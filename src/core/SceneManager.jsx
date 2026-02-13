@@ -10,6 +10,7 @@ import GamingRoom from '../scenes/rooms/GamingRoom.jsx';
 import DanceRoom from '../scenes/rooms/DanceRoom.jsx';
 import StudyRoom from '../scenes/rooms/StudyRoom.jsx';
 import GardenRoom from '../scenes/rooms/GardenRoom.jsx';
+import GardenSittingArea from '../scenes/rooms/GardenSittingArea.jsx';
 
 export default class SceneManager {
   constructor(app) {
@@ -39,6 +40,8 @@ export default class SceneManager {
         return new StudyRoom(this);
       case SCENES.GARDEN:
         return new GardenRoom(this);
+      case SCENES.GARDEN_SITTING:
+        return new GardenSittingArea(this);
       default:
         console.warn(`Unknown scene: ${sceneName}`);
         return null;
