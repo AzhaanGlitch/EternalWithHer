@@ -1,7 +1,7 @@
 // src/scenes/rooms/BedroomRoom.jsx
 import BaseRoom from '../BaseRoom.jsx';
 import { ROOM_CONFIGS } from '../../core/constants.jsx';
-import bedroomImg from '../../assets/images/bedroom.png';
+import bedroomImg from '../../assets/images/BedRoom/bedroom.png';
 
 export default class BedroomRoom extends BaseRoom {
     constructor(manager) {
