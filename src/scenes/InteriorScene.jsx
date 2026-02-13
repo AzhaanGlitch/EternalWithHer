@@ -256,8 +256,12 @@ export default class InteriorScene {
     });
     door.on('pointertap', () => {
       if (!this.isInteractive) return;
-      // soundManager.play('doorOpen');
+      // Play door opening sound effect (any previous SFX will fade out automatically)
+      soundManager.playSFX('doorOpen', { volume: 0.6 });
       this.isInteractive = false;
+
+      // Fade out the ambient sound smoothly
+      soundManager.stopAmbient();
 
       gsap.to(doorGlow, { alpha: 0.8, duration: 0.4 });
       gsap.to(this.container, { alpha: 0, duration: 0.5, delay: 0.1, ease: 'power2.in' });
@@ -271,6 +275,9 @@ export default class InteriorScene {
   }
 
   enter() {
+    // Register door opening sound effect
+    soundManager.register('doorOpen', '/assets/sounds/Door_Opening_SoundEffect.mp3', { loop: false, volume: 0.6 });
+
     soundManager.setAmbient('/assets/sounds/home_interior.mp3', { volume: 0.35, loop: true });
 
     this.container.alpha = 0;
