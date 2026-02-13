@@ -33,8 +33,8 @@ export function WaveAnimation({
     // Register curtain sound (not ambient — so it doesn't conflict with scene ambient)
     soundManager.register('curtainOpening', '/assets/sounds/curtain_opening.mp3', { loop: true, volume: 0.4 })
 
-    // Register curtain sound
-    soundManager.register('curtainOpening', '/assets/sounds/curtain_opening.mp3', { loop: true, volume: 0.4 })
+    // Register wind sound for rope dragging
+    soundManager.register('windEffect', '/assets/sounds/Wind_SoundEffect.mp3', { loop: true, volume: 0.5 })
 
     // Strategy to play sound ASAP:
     // 1. Try immediately (works if user interacted before reload)
@@ -229,6 +229,38 @@ export function WaveAnimation({
     })
     Matter.Composite.add(engine.world, mouseConstraint)
 
+    // ── Wind sound: starts on first rope interaction, plays until curtain fully opens ──
+    let windSoundStarted = false
+    const startWindSound = () => {
+      if (windSoundStarted || isOpeningRef.current) return
+      windSoundStarted = true
+      soundManager.resumeContext()
+      soundManager.playSFX('windEffect', { volume: 0.5 })
+    }
+
+    // Detect any mouse/touch interaction on the rope canvas
+    const handleRopeInteraction = (event) => {
+      if (windSoundStarted || isOpeningRef.current) return
+      // Get mouse position relative to canvas
+      const rect = ropeCanvas.getBoundingClientRect()
+      const mouseX = (event.clientX || (event.touches && event.touches[0]?.clientX) || 0) - rect.left
+      const mouseY = (event.clientY || (event.touches && event.touches[0]?.clientY) || 0) - rect.top
+
+      // Check proximity to any rope body or tassel
+      const allBodies = [...bodies, tassel]
+      for (const body of allBodies) {
+        const dx = body.position.x - mouseX
+        const dy = body.position.y - mouseY
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist < 50) { // within 50px of any rope segment
+          startWindSound()
+          break
+        }
+      }
+    }
+    ropeCanvas.addEventListener('mousedown', handleRopeInteraction)
+    ropeCanvas.addEventListener('touchstart', handleRopeInteraction)
+
     // Start physics
     const runner = Matter.Runner.create()
     Matter.Runner.run(runner, engine)
@@ -261,8 +293,9 @@ export function WaveAnimation({
         if (pullDistance > pullThreshold) {
           isOpeningRef.current = true
           hasTriggeredRef.current = true
-          // Stop curtain sound
-          soundManager.stop('curtainOpening')
+          // Stop curtain sound with fade out
+          soundManager.stopWithFade('curtainOpening', 500)
+          // Wind sound keeps playing — will fade out when animation completes
           Matter.Composite.remove(engine.world, mouseConstraint)
           startCurtainOpen()
         }
@@ -270,7 +303,7 @@ export function WaveAnimation({
 
       // ── Move curtains apart ──
       if (openProgress.current > 0) {
-        const separation = openProgress.current * 900
+        const separation = openProgress.current * 1600
         leftMesh.position.x = -separation
         rightMesh.position.x = separation
         leftMat.uniforms.u_openProgress.value = openProgress.current
@@ -305,8 +338,12 @@ export function WaveAnimation({
 
         if (t < 1) {
           requestAnimationFrame(step)
-        } else if (onCurtainOpen) {
-          setTimeout(() => onCurtainOpen(), 300)
+        } else {
+          // Curtain animation fully complete — fade out the wind sound
+          soundManager.stopWithFade('windEffect', 800)
+          if (onCurtainOpen) {
+            setTimeout(() => onCurtainOpen(), 300)
+          }
         }
       }
       step()
@@ -338,8 +375,13 @@ export function WaveAnimation({
       window.removeEventListener("touchstart", startCurtainSound)
       window.removeEventListener("keydown", startCurtainSound)
 
-      // Stop sound on unmount (safety net)
-      soundManager.stop('curtainOpening')
+      // Stop sounds on unmount with fade (safety net)
+      soundManager.stopWithFade('curtainOpening', 300)
+      soundManager.stopWithFade('windEffect', 300)
+
+      // Remove rope interaction listeners
+      ropeCanvas.removeEventListener('mousedown', handleRopeInteraction)
+      ropeCanvas.removeEventListener('touchstart', handleRopeInteraction)
 
       if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current)
       Matter.Runner.stop(runner)
