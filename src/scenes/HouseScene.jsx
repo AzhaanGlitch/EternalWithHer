@@ -185,7 +185,8 @@ export default class HouseScene {
     });
     this.elements.door.on('pointertap', () => {
       if (!this.isInteractive) return;
-      // soundManager.play('doorOpen'); // Removing incorrect sound
+      // Play door opening sound effect (any previous SFX will fade out automatically)
+      soundManager.playSFX('doorOpen', { volume: 0.6 });
       this.openDoor();
     });
   }
@@ -227,7 +228,8 @@ export default class HouseScene {
   }
 
   enter() {
-    // soundManager.register('doorOpen', '/assets/sounds/curtain_opening.mp3'); // Incorrect sound
+    // Register door opening sound effect
+    soundManager.register('doorOpen', '/assets/sounds/Door_Opening_SoundEffect.mp3', { loop: false, volume: 0.6 });
 
     // Start city ambient music only after curtain is done
     // (HouseScene.enter() is called immediately by Game, before curtain opens)
