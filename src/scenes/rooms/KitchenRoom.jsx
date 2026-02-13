@@ -1,7 +1,7 @@
 // src/scenes/rooms/KitchenRoom.jsx
 import BaseRoom from '../BaseRoom.jsx';
 import { ROOM_CONFIGS } from '../../core/constants.jsx';
-import kitchenImg from '../../assets/images/kitchen.png';
+import kitchenImg from '../../assets/images/Kitchen/kitchen.png';
 
 export default class KitchenRoom extends BaseRoom {
   constructor(manager) {
