@@ -1,7 +1,7 @@
 // src/scenes/rooms/DanceRoom.jsx
 import BaseRoom from '../BaseRoom.jsx';
 import { ROOM_CONFIGS } from '../../core/constants.jsx';
-import danceRoomImg from '../../assets/images/dance_room.jpeg';
+import danceRoomImg from '../../assets/images/DanceRoom/dance_room.jpeg';
 
 export default class DanceRoom extends BaseRoom {
   constructor(manager) {
