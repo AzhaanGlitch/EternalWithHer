@@ -118,7 +118,7 @@ export default class BaseRoom {
 
         text.on('pointertap', () => {
             if (this.isInteractive) {
-                soundManager.play('click');
+                soundManager.playSFX('click', { volume: 0.6 });
                 this.manager.goBack();
             }
         });
@@ -130,7 +130,8 @@ export default class BaseRoom {
 
 
     enter() {
-        // Override in subclass if needed
+        // Register click sound for back button
+        soundManager.register('click', '/assets/sounds/Click_SoundEffect.mp3', { loop: false, volume: 0.6 });
     }
 
     update(delta) {
