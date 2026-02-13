@@ -1,7 +1,7 @@
 // src/scenes/rooms/StudyRoom.jsx
 import BaseRoom from '../BaseRoom.jsx';
 import { ROOM_CONFIGS } from '../../core/constants.jsx';
-import studyRoomImg from '../../assets/images/study_room.jpeg';
+import studyRoomImg from '../../assets/images/StudyRoom/study_room.jpeg';
 
 export default class StudyRoom extends BaseRoom {
     constructor(manager) {
