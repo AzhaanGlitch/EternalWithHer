@@ -5,6 +5,8 @@ class SoundManager {
     constructor() {
         this.sounds = {};
         this.ambientSound = null;
+        this.currentSFX = null;       // currently playing SFX name
+        this.currentSFXId = null;     // Howl play-id of that SFX
         this.isMuted = false;
         this.masterVolume = 0.7;
 
@@ -59,11 +61,79 @@ class SoundManager {
         return id;
     }
 
-    // Stop a specific sound
+    // Stop a specific sound (immediately)
     stop(name) {
         const sound = this.sounds[name];
         if (sound) {
             sound.stop();
+        }
+    }
+
+    // Stop a specific sound with a fade-out effect
+    stopWithFade(name, fadeDuration = 500) {
+        const sound = this.sounds[name];
+        if (!sound) return;
+
+        // Get the current volume before fading
+        const currentVol = sound.volume();
+        sound.fade(currentVol, 0, fadeDuration);
+        setTimeout(() => {
+            sound.stop();
+            sound.volume(currentVol); // restore original volume for next play
+        }, fadeDuration);
+    }
+
+    /**
+     * Play a one-shot SFX with automatic crossfade management.
+     * If another SFX is currently playing, it fades out before the new one starts.
+     * @param {string} name - Registered sound name
+     * @param {object} options - { volume, rate, fadeDuration }
+     */
+    playSFX(name, options = {}) {
+        if (this.isMuted) return null;
+
+        const fadeDuration = options.fadeDuration || 400;
+
+        // Fade out previous SFX if one is playing
+        if (this.currentSFX && this.currentSFX !== name) {
+            this.stopWithFade(this.currentSFX, fadeDuration);
+        }
+
+        const sound = this.sounds[name];
+        if (!sound) {
+            console.warn(`Sound "${name}" not found`);
+            return null;
+        }
+
+        const id = sound.play();
+
+        if (options.volume !== undefined) {
+            sound.volume(options.volume, id);
+        }
+        if (options.rate !== undefined) {
+            sound.rate(options.rate, id);
+        }
+
+        this.currentSFX = name;
+        this.currentSFXId = id;
+
+        // When the SFX ends naturally, clear the tracker
+        sound.once('end', () => {
+            if (this.currentSFX === name) {
+                this.currentSFX = null;
+                this.currentSFXId = null;
+            }
+        }, id);
+
+        return id;
+    }
+
+    // Stop the current SFX with fade out
+    stopSFX(fadeDuration = 400) {
+        if (this.currentSFX) {
+            this.stopWithFade(this.currentSFX, fadeDuration);
+            this.currentSFX = null;
+            this.currentSFXId = null;
         }
     }
 
