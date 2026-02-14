@@ -12,6 +12,7 @@ export const SCENES = {
   STUDY: 'STUDY',
   GARDEN: 'GARDEN',
   GARDEN_SITTING: 'GARDEN_SITTING',
+  GARDEN_PATH: 'GARDEN_PATH',
 };
 
 export const COLORS = {
@@ -83,6 +84,13 @@ export const ROOM_CONFIGS = {
   GARDEN_SITTING: {
     title: 'Sitting Area',
     subtitle: 'A Quiet Place',
+    color: 0x228b22,
+    gradientTop: 0x1a3a2a,
+    gradientBottom: 0x0a2a1a,
+  },
+  GARDEN_PATH: {
+    title: 'Stone Path',
+    subtitle: 'Walking Down Memory Lane',
     color: 0x228b22,
     gradientTop: 0x1a3a2a,
     gradientBottom: 0x0a2a1a,
