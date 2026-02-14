@@ -35,6 +35,7 @@ export function WaveAnimation({
 
     // Register wind sound for rope dragging
     soundManager.register('windEffect', '/assets/sounds/Wind_SoundEffect.mp3', { loop: true, volume: 0.5 })
+    soundManager.register('fahEffect', '/assets/sounds/Fahhhh.mp3', { loop: true, volume: 0.5 })
 
     // Strategy to play sound ASAP:
     // 1. Try immediately (works if user interacted before reload)
@@ -236,6 +237,7 @@ export function WaveAnimation({
       windSoundStarted = true
       soundManager.resumeContext()
       soundManager.playSFX('windEffect', { volume: 0.5 })
+      soundManager.play('fahEffect', { volume: 0.5 })
     }
 
     // Detect any mouse/touch interaction on the rope canvas
@@ -341,6 +343,7 @@ export function WaveAnimation({
         } else {
           // Curtain animation fully complete — fade out the wind sound
           soundManager.stopWithFade('windEffect', 800)
+          soundManager.stopWithFade('fahEffect', 800)
           if (onCurtainOpen) {
             setTimeout(() => onCurtainOpen(), 300)
           }
@@ -378,6 +381,7 @@ export function WaveAnimation({
       // Stop sounds on unmount with fade (safety net)
       soundManager.stopWithFade('curtainOpening', 300)
       soundManager.stopWithFade('windEffect', 300)
+      soundManager.stopWithFade('fahEffect', 300)
 
       // Remove rope interaction listeners
       ropeCanvas.removeEventListener('mousedown', handleRopeInteraction)
