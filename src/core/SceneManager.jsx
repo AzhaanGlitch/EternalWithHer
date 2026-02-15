@@ -12,6 +12,7 @@ import StudyRoom from '../scenes/rooms/StudyRoom.jsx';
 import GardenRoom from '../scenes/rooms/GardenRoom.jsx';
 import GardenSittingArea from '../scenes/rooms/GardenSittingArea.jsx';
 import GardenPath from '../scenes/rooms/GardenPath.jsx';
+import Balcony from '../scenes/rooms/Balcony.jsx';
 
 export default class SceneManager {
   constructor(app) {
@@ -31,6 +32,8 @@ export default class SceneManager {
         return new LivingRoom(this);
       case SCENES.BEDROOM:
         return new BedroomRoom(this);
+      case SCENES.BALCONY:
+        return new Balcony(this);
       case SCENES.KITCHEN:
         return new KitchenRoom(this);
       case SCENES.GAMING:
@@ -57,6 +60,7 @@ export default class SceneManager {
     const { transition = 'fade', duration = 0.5, addToHistory = true } = options;
 
     this.transitioning = true;
+    console.log(`Changing scene to: ${sceneName}`, options);
 
     // Exit current scene with transition
     if (this.currentScene) {
