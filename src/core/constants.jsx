@@ -13,6 +13,7 @@ export const SCENES = {
   GARDEN: 'GARDEN',
   GARDEN_SITTING: 'GARDEN_SITTING',
   GARDEN_PATH: 'GARDEN_PATH',
+  BALCONY: 'BALCONY',
 };
 
 export const COLORS = {
@@ -45,6 +46,13 @@ export const ROOM_CONFIGS = {
     color: 0xdda0dd,
     gradientTop: 0x2a1a2a,
     gradientBottom: 0x1a0a1a,
+  },
+  BALCONY: {
+    title: 'Balcony',
+    subtitle: 'A View to Remember',
+    color: 0x87CEEB, // Sky blueish
+    gradientTop: 0x4682B4,
+    gradientBottom: 0x1E90FF,
   },
   KITCHEN: {
     title: 'Kitchen',
