@@ -58,9 +58,8 @@ export default class GardenPath extends BaseRoom {
             });
 
             // Register Sound
-            // Use numeric ID from areaConfig.id (e.g. 'area1' -> '1') for the file name
             const idNum = areaConfig.id.replace('area', '');
-            const soundPath = `/assets/sounds/Garden/${idNum}.mpeg`;
+            const soundPath = `/assets/sounds/Garden/${idNum}.mp3`;
 
             // Register with existing 'garden_1' naming key, but use new path
             soundManager.register(areaConfig.sound, soundPath, { loop: true, volume: 0.6 });
