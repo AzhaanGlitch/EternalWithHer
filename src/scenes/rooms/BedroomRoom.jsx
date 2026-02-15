@@ -39,8 +39,9 @@ export default class BedroomRoom extends BaseRoom {
 
     async init() {
         await super.init();
-        await this.createCollageInteraction();
+        // Create Balcony first so the collage overlay is initialized later and stays on top
         await this.createBalconyInteraction();
+        await this.createCollageInteraction();
     }
 
     async createBalconyInteraction() {
@@ -208,6 +209,7 @@ export default class BedroomRoom extends BaseRoom {
         if (this.elements.background) this.elements.background.filters = [blur];
         if (this.elements.wallCollage) this.elements.wallCollage.filters = [blur];
         if (this.elements.backButton) this.elements.backButton.filters = [blur];
+        if (this.elements.balconyArea) this.elements.balconyArea.filters = [blur];
 
         this.overlayContainer.visible = true;
 
@@ -233,6 +235,7 @@ export default class BedroomRoom extends BaseRoom {
         if (this.elements.background) this.elements.background.filters = [];
         if (this.elements.wallCollage) this.elements.wallCollage.filters = [];
         if (this.elements.backButton) this.elements.backButton.filters = [];
+        if (this.elements.balconyArea) this.elements.balconyArea.filters = [];
 
         // Animate Out
         gsap.to(this.overlayContainer, {
