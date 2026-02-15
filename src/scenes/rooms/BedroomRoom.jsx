@@ -14,7 +14,15 @@ const COLLAGE_POS = {
     y: 320,
     angle: 2
 };
-const COLLAGE_SCALE = 0.08;
+const COLLAGE_SCALE = 0.09;
+
+// --- BALCONY CLICK AREA ---
+const BALCONY_POINTS = {
+    topLeft: { x: 890, y: 250 },
+    topRight: { x: 1350, y: 190 },
+    bottomRight: { x: 1350, y: 650 },
+    bottomLeft: { x: 890, y: 590 }
+};
 
 export default class BedroomRoom extends BaseRoom {
     constructor(manager) {
@@ -32,6 +40,85 @@ export default class BedroomRoom extends BaseRoom {
     async init() {
         await super.init();
         await this.createCollageInteraction();
+        await this.createBalconyInteraction();
+    }
+
+    async createBalconyInteraction() {
+        // Create the glassy area container
+        const glassArea = new PIXI.Container();
+
+        const pts = [
+            BALCONY_POINTS.topLeft.x, BALCONY_POINTS.topLeft.y,
+            BALCONY_POINTS.topRight.x, BALCONY_POINTS.topRight.y,
+            BALCONY_POINTS.bottomRight.x, BALCONY_POINTS.bottomRight.y,
+            BALCONY_POINTS.bottomLeft.x, BALCONY_POINTS.bottomLeft.y
+        ];
+
+        // Base polygon (semi-transparent glass)
+        const glass = new PIXI.Graphics();
+        glass.poly(pts);
+        glass.fill({ color: 0xffffff, alpha: 0.1 });
+        glass.stroke({ width: 1, color: 0xffffff, alpha: 0.3 });
+
+        // Shimmer mask (same polygon)
+        const mask = new PIXI.Graphics();
+        mask.poly(pts);
+        mask.fill(0xffffff);
+        glassArea.mask = mask;
+        glassArea.addChild(mask);
+
+        // Find bounding box for shimmer movement
+        const minX = Math.min(BALCONY_POINTS.topLeft.x, BALCONY_POINTS.bottomLeft.x);
+        const maxX = Math.max(BALCONY_POINTS.topRight.x, BALCONY_POINTS.bottomRight.x);
+        const minY = Math.min(BALCONY_POINTS.topLeft.y, BALCONY_POINTS.topRight.y);
+        const maxY = Math.max(BALCONY_POINTS.bottomLeft.y, BALCONY_POINTS.bottomRight.y);
+        const height = maxY - minY;
+
+        // Shimmer gradient
+        const shimmer = new PIXI.Graphics();
+        shimmer.poly([
+            0, 0,
+            100, 0,
+            200, height,
+            100, height
+        ]);
+        shimmer.fill({ color: 0xffffff, alpha: 0.2 });
+        shimmer.x = minX - 300;
+        shimmer.y = minY;
+
+        glassArea.addChild(glass);
+        glassArea.addChild(shimmer);
+
+        // Interactivity
+        glassArea.eventMode = 'static';
+        glassArea.cursor = 'pointer';
+
+        // Hover effect
+        glassArea.on('pointerover', () => {
+            gsap.to(glass, { alpha: 0.2, duration: 0.3 });
+        });
+        glassArea.on('pointerout', () => {
+            gsap.to(glass, { alpha: 0.1, duration: 0.3 });
+        });
+
+        // Click to navigate
+        glassArea.on('pointertap', () => {
+            if (this.isCollageOpen) return;
+            soundManager.playSFX('click');
+            this.manager.change('BALCONY');
+        });
+
+        // Shimmer animation
+        gsap.to(shimmer, {
+            x: maxX + 100,
+            duration: 3,
+            repeat: -1,
+            ease: "none",
+            delay: 1
+        });
+
+        this.elements.balconyArea = glassArea;
+        this.container.addChild(glassArea);
     }
 
     async createCollageInteraction() {
@@ -165,6 +252,21 @@ export default class BedroomRoom extends BaseRoom {
             (width * margin) / texWidth,
             (height * margin) / texHeight
         );
+    }
+
+    exit() {
+        super.exit();
+        // Kill the infinite shimmer animation to prevent errors when scene is destroyed
+        if (this.elements.balconyArea) {
+            gsap.killTweensOf(this.elements.balconyArea.children);
+        }
+        if (this.elements.wallCollage) {
+            gsap.killTweensOf(this.elements.wallCollage);
+        }
+        if (this.overlayContainer) {
+            gsap.killTweensOf(this.overlayContainer);
+            gsap.killTweensOf(this.overlayContainer.children);
+        }
     }
 
     resize() {
